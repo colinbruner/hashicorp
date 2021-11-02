@@ -1,0 +1,14 @@
+{
+  "builds": [
+    {
+      "name": "base_nomad_server",
+      "builder_type": "amazon-ebs",
+      "build_time": 1634936284,
+      "files": null,
+      "artifact_id": "us-east-1:ami-09478a449cac1afe7",
+      "packer_run_uuid": "09349905-64da-1ab0-db51-e32a449aa045",
+      "custom_data": null
+    }
+  ],
+  "last_run_uuid": "09349905-64da-1ab0-db51-e32a449aa045"
+}

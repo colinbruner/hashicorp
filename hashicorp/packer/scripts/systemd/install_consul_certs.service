@@ -1,0 +1,14 @@
+[Unit]
+Description=Installs Consul certs before Consul starts
+After=network.target
+Before=consul.service
+
+[Service]
+Type=oneshot
+EnvironmentFile=/etc/default/install_consul_certs
+ExecStart=/opt/install_consul_certs.py
+RemainAfterExit=true
+StandardOutput=journal
+
+[Install]
+WantedBy=multi-user.target
