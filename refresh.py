@@ -59,6 +59,8 @@ def preflight_sanity():
     if not list(headers[system].values())[0]:
         print(f"Token for {system} is not defined. Please export {tokens[system]} and try again.")
         sys.exit(1)
+    else:
+        print(f"Success. Token for {system} found with environment variables.")
 
     # Remove any 'https://' protocol strings, remove any ending (e.g.) ':8200' port strings
     if ":" in system_addr:
@@ -67,6 +69,8 @@ def preflight_sanity():
     if not socket.gethostbyname(system_hostname):
         print(f"Unable to resolve {system_hostname} based off environment variables.")
         sys.exit(2)
+    else:
+        print(f"Success. Able to resolve {system_hostname} address.")
 
     # Final check print account ID
     print("Checking authentication against AWS.")
