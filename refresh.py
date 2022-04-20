@@ -203,8 +203,8 @@ if __name__ == "__main__":
     ###
     # Total Peers
     peers = get_peers()
-    # Move 'Leader' to end of the list
-    peers.append(peers.pop(0))
+    # Sort 'Leader' to end of the list
+    peers.sort(key=lambda x: x[leader_key] == True)
     # Initial Total Peers count
     total_peers = len(peers)
 
