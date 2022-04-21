@@ -83,7 +83,8 @@ def preflight_sanity():
 def get_peers():
     """Fetch all node JSON via systems API"""
     data = requests.get(system_url, headers=headers[system]).json()
-    if system == "consul" or "nomad":
+    if system == "consul" or system == "nomad":
+        print(system)
         return data["Servers"]
     elif system == "vault":
         return data["data"]["config"]["servers"]
@@ -117,7 +118,26 @@ def check_cluster_peers(waiting=bool) -> bool:
         return True
 
 
-def terminate_peer(peer):
+def remove_peer(peer=dict):
+    """
+    Removes a Peer from Vaults raft configuration.
+    This currently only applies to Vault systems.
+    """
+    # Remove a peer by 'server_id', its node identifier
+    node = peer[node_key]
+
+    remove_peer_endpoint = "/v1/sys/storage/raft/remove-peer"
+    remove_peer_url = system_addr + remove_peer_endpoint
+    data = requests.post(remove_peer_url, data={"server_id": node}, headers=headers[system])
+    # Vault returns a 204, 'No Content'. Not really sure how to error handle this, so just exiting.
+    if data.status_code == 204:
+        print(f"Successfully removed {node} from {system.title()}'s raft configuration.")
+    else:
+        print(f"ERROR Unable to remove {node} from raft. Exiting now, please review.")
+        sys.exit(3)
+
+
+def terminate_peer(peer=dict):
     """
     Terminate an EC2 instance by instance ID.
     returns: datetime object representing time since last terminated
@@ -157,6 +177,11 @@ def main():
         # Ensure cluster has its initial total number of peers
         while waiting:
             waiting = check_cluster_peers(waiting)
+
+        # Vault does not set 'cleanup_dead_servers' to True by default. When cycling peers, they must
+        # be manually cleaned up unless this autopilot setting is enabled.
+        if system == "vault":
+            remove_peer(peer)
 
         # Terminate the instance
         terminated_time = terminate_peer(peer)
@@ -203,7 +228,7 @@ if __name__ == "__main__":
     ###
     # Total Peers
     peers = get_peers()
-    # Sort 'Leader' to end of the list
+    # Move 'Leader' to end of the list
     peers.sort(key=lambda x: x[leader_key] == True)
     # Initial Total Peers count
     total_peers = len(peers)
