@@ -1,5 +1,21 @@
 #!/usr/bin/env python3
 
+###
+# Usage: Refresh Hashicorp Servers (Vault, Nomad, Consul) deployed on AWS EC2 within an ASG.
+#
+# This script will iterate through servers deployed in the ASG, remove the peer if necessary, and
+# terminate the instnace, and wait until a new server is created, joins the cluster, and syncs down
+# its Raft state and becomes an eligible voter within the cluster.
+#
+# NOTE: This is used against systems with an Enterprise license. I have not verified this will
+# work properly against the OSS variant, but I suspect there would be no issues.
+#
+# Tested Against:
+# - Vault: 1.10.x
+# - Consul: 1.11.x
+# - Nomad: 1.3.x
+###
+
 import os
 import sys
 import time
@@ -36,6 +52,13 @@ class System:
         "vault": "/v1/sys/storage/raft/configuration",
     }
     _api_raft_remove = {"vault": "/v1/sys/storage/raft/remove-peer", "consul": "", "nomad": ""}
+
+    _api_nomad_nodes = {
+        "list": "/v1/nodes",
+        "get": "/v1/node/",
+        "list_allocs": "/v1/node/{node_id}/allocations",
+        "drain": "/v1/node/{node_id}/drain",
+    }
 
     _keymap = {
         "consul": {"node": "Node", "leader": "Leader", "voter": "Voter"},
@@ -99,9 +122,7 @@ class System:
             print(f"Success: Resolved {system_hostname} address.")
 
         # Final check print account ID
-        print(
-            f"Success: Authenticated to AWS. Will continue under AccountID {boto3.client('sts').get_caller_identity()['Account']}"
-        )
+        print(f"Success: Authenticated to AWS. Will continue under AccountID {boto3.client('sts').get_caller_identity()['Account']}")
 
     def get_raft_config(self) -> list:
         """Gets raft configuration for a cluster."""
@@ -118,9 +139,7 @@ class System:
 
         if current_total_peers == total_peers:
             # Original number of peers are back.
-            print(
-                f"Determined {current_total_peers} peers out of an expected total: {total_peers} peers have joined the cluster."
-            )
+            print(f"Determined {current_total_peers} peers out of an expected total: {total_peers} peers have joined the cluster.")
 
             # We need Voter = True on the last instance to be included in the cluster. Check last element of list to confirm.
             # TODO: This is not necessarily authorative, I don't know if the order will be the same across systems so this could fail?
@@ -132,9 +151,7 @@ class System:
                 print(f"Peer has registered as a voter and synced raft data successfully, continuing.")
                 return False
         else:
-            print(
-                f"Sleeping for 10s to wait for a total of {total_peers} {self.name.title()} Servers to join the cluster."
-            )
+            print(f"Sleeping for 10s to wait for a total of {total_peers} {self.name.title()} Servers to join the cluster.")
             time.sleep(10)
             return True
 
@@ -224,6 +241,13 @@ if __name__ == "__main__":
         type=str,
         required=True,
     )
+    parser.add_argument(
+        "--clients",
+        help="Refresh Nomad Clients, only applicable when --system='nomad'",
+        type=bool,
+        default=False,
+        required=False,
+    )
     args = parser.parse_args()
 
     # Working with only a single system, this will be our pointer
@@ -240,8 +264,8 @@ if __name__ == "__main__":
     ###
     # Total Peers
     peers = system.get_raft_config()
-    # Move 'Leader' to end of the list
-    peers.sort(key=lambda x: x[system.leader_key] == True)
+    # Move 'Leader' to end of the list, leader_key is a bool
+    peers.sort(key=lambda x: x[system.leader_key])
     # Initial Total Peers count
     total_peers = len(peers)
 
